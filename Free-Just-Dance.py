@@ -1,6 +1,13 @@
 import cv2
 import mediapipe as mp
 import subprocess
+import json
+
+# Charger les poses de référence
+with open("poses/dance1.json", "r") as f:
+    reference_poses = json.load(f)
+
+video_frame_index = 0
 
 options = mp.tasks.vision.PoseLandmarkerOptions(
     base_options=mp.tasks.BaseOptions(model_asset_path="pose_landmarker.task"),
@@ -25,6 +32,25 @@ while True:
     # Analyser chaque frame
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     result = detector.detect(mp_image)
+    # Calculer le score
+    score = 0
+    if result.pose_landmarks and video_frame_index < len(reference_poses):
+        ref_pose = reference_poses[video_frame_index]
+        if len(ref_pose) > 0:
+            player_pose = result.pose_landmarks[0]
+            points_utiles = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]
+            total_diff = 0
+            for i in points_utiles:
+                dx = player_pose[i].x - ref_pose[i]["x"]
+                dy = player_pose[i].y - ref_pose[i]["y"]
+                total_diff += (dx**2 + dy**2) ** 0.5
+            score = max(0, 100 - int(total_diff * 200))
+
+    video_frame_index += 1
+
+    # Afficher le score
+    cv2.putText(image, f"Score: {score}", (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     if result.pose_landmarks:
         for pose in result.pose_landmarks:
